@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const authRoutes = require('./routes/authRoute');
+const testimonialRoutes = require('./routes/testimonialRoute');
 
 const app = express();
 const PORT = process.env.PORT;
@@ -11,6 +12,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/testimonials', testimonialRoutes);
 
 async function connectDB() {
   try {
