@@ -14,4 +14,6 @@ router.delete('/:testimonialId', testimonialController.deleteTestimonial);
 router.get('/settings', testimonialController.getSettings);
 router.post('/settings', testimonialController.upsertSettings);
 
+router.get('/analytics', testimonialController.getAnalytics);
+
 module.exports = router;
