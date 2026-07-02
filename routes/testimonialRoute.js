@@ -11,4 +11,7 @@ router.get('/', testimonialController.getTestimonials);
 router.put('/:testimonialId', testimonialController.updateTestimonial);
 router.delete('/:testimonialId', testimonialController.deleteTestimonial);
 
+router.get('/settings', testimonialController.getSettings);
+router.post('/settings', testimonialController.upsertSettings);
+
 module.exports = router;
