@@ -239,3 +239,115 @@ exports.upsertSettings = async (req, res) => {
         });
     }
 };
+exports.getAnalytics = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { startDate, endDate } = req.query;
+        const matchStage = {
+            userId,
+            isDeleted: false
+        };
+
+        if (startDate && isNaN(Date.parse(startDate))) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                code: HTTP_STATUS.BAD_REQUEST,
+                status: RESPONSE_STATUS.FAILURE,
+                message: "Invalid startDate format."
+            });
+        }
+
+        if (endDate && isNaN(Date.parse(endDate))) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                code: HTTP_STATUS.BAD_REQUEST,
+                status: RESPONSE_STATUS.FAILURE,
+                message: "Invalid endDate format."
+            });
+        }
+        
+        if (startDate || endDate) {
+            matchStage.createdAt = {};
+            if (startDate) {
+                matchStage.createdAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                matchStage.createdAt.$lte = new Date(endDate);
+            }
+        }
+
+        const analytics = await Testimonial.aggregate([
+            {
+              $match: matchStage
+            },
+            {
+              $facet: {
+                  overview: [
+                      {
+                          $group: {
+                              _id: null,
+                              total: {
+                                  $sum: 1
+                              },
+                              averageRating: {
+                                  $avg: "$rating"
+                              }
+                          }
+                      }
+                  ],
+                  byStatus: [
+                      {
+                          $group: {
+                              _id: "$status",
+                              count: {
+                                  $sum: 1
+                              }
+                          }
+                      }
+                  ]
+              }
+            }
+        ]);
+
+        const overview = analytics[0].overview[0] || {
+            total: 0,
+            averageRating: 0
+        };
+
+        const statusCounts = {
+            draft: 0,
+            recording: 0,
+            processing: 0,
+            completed: 0,
+            shared: 0
+        };
+
+        analytics[0].byStatus.forEach(item => {
+            statusCounts[item._id] = item.count;
+        });
+
+        return res.status(HTTP_STATUS.OK).json({
+            code: HTTP_STATUS.OK,
+            status: RESPONSE_STATUS.SUCCESS,
+            message: "Data retrieved successfully",
+            data: {
+                overview: {
+                    total: overview.total,
+                    byStatus: statusCounts,
+                    averageRating: Number(
+                        (overview.averageRating || 0).toFixed(1)
+                    )
+                },
+                period: {
+                    startDate: startDate || null,
+                    endDate: endDate || null
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Analytics error:", error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            status: RESPONSE_STATUS.FAILURE,
+            message: "Internal server error."
+        });
+    }
+};
