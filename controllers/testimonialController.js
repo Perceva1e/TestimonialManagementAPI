@@ -1,4 +1,5 @@
 const Testimonial = require('../models/testimonial');
+const TestimonialSettings = require('../models/testimonialSettings');
 const { v4: uuidv4 } = require('uuid');
 const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
 
@@ -179,4 +180,62 @@ exports.deleteTestimonial = async (req, res) => {
       message: 'Internal server error.'
     });
   }
+};
+
+exports.getSettings = async (req, res) => {
+    try {
+        const settings = await TestimonialSettings.findOne({
+            userId: req.user.userId
+        });
+        
+        return res.status(HTTP_STATUS.OK).json({
+            code: HTTP_STATUS.OK,
+            status: RESPONSE_STATUS.SUCCESS,
+            message: "Settings retrieved successfully",
+            data: settings || null
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            status: RESPONSE_STATUS.FAILURE,
+            message: "Internal server error."
+        });
+
+    }
+};
+
+exports.upsertSettings = async (req, res) => {
+    try {
+        const updateData = req.body;
+        delete updateData.userId;
+        const settings = await TestimonialSettings.findOneAndUpdate(
+            {
+                userId: req.user.userId
+            },
+            {
+                $set: updateData
+            },
+            {
+                new: true,
+                upsert: true,
+                runValidators: true,
+                setDefaultsOnInsert: true
+            }
+        );
+
+        return res.status(HTTP_STATUS.OK).json({
+            code: HTTP_STATUS.OK,
+            status: RESPONSE_STATUS.SUCCESS,
+            message: "Settings saved successfully",
+            data: settings
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            status: RESPONSE_STATUS.FAILURE,
+            message: "Internal server error."
+        });
+    }
 };
