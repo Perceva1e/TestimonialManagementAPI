@@ -18,7 +18,11 @@ const testimonialSchema = new mongoose.Schema({
   customerEmail: {
     type: String,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    match: [
+    /^\S+@\S+\.\S+$/,
+    'Please enter a valid email address.'
+    ]
   },
   customerPhone: {
     type: String,
@@ -26,7 +30,11 @@ const testimonialSchema = new mongoose.Schema({
   },
   videoUrl: {
     type: String,
-    trim: true
+    trim: true,
+    match: [
+      /^https?:\/\/.+/,
+      'Please enter a valid URL.'
+    ]
   },
   rating: {
     type: Number,
@@ -51,8 +59,12 @@ const testimonialSchema = new mongoose.Schema({
     type: Date
   },
   sharedChannels: {
-    type: [String],
-    enum: ['email', 'sms', 'facebook', 'instagram'],
+    type:[
+      {
+        type: String,
+        enum: ['email', 'sms', 'facebook', 'instagram']
+      }
+    ],
     default: []
   },
   isDeleted: {
