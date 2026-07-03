@@ -26,7 +26,11 @@ const testimonialSchema = new mongoose.Schema({
   },
   customerPhone: {
     type: String,
-    trim: true
+    trim: true,
+    match: [
+      /^\+?[\d\s\-()]{7,20}$/,
+      'Please enter a valid phone number.'
+    ]
   },
   videoUrl: {
     type: String,
