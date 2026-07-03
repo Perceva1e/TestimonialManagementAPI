@@ -5,7 +5,7 @@ const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
 
 exports.createTestimonial = async (req, res, next) => {
   try {
-    const { customerName, customerEmail, customerPhone, rating, text, videoUrl } = req.body;
+    const { customerName, customerEmail, customerPhone, rating, text, videoUrl, consentGiven } = req.body;
 
     const newTestimonial = new Testimonial({
       testimonialId: uuidv4(), 
