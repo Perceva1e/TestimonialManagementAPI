@@ -12,19 +12,30 @@ const testimonialSettingsSchema = new mongoose.Schema({
   },
   defaultVideoLength: {
     type: Number,
-    default: 10
+    default: 10,
+    min: 5,
+    max: 60
   },
   videoLengthOptions: {
     type: [Number],
-    default: [5, 10, 15, 20, 25]
+    default: [5,10,15,20,25],
+    validate: {
+        validator(values) {
+            return values.every(v => v >= 5 && v <= 60);
+        },
+        message: "Video length must be between 5 and 60 seconds."
+    }
   },
   questionnaire: {
     type: [String],
     default: ["What do you like about our service?"]
   },
   sendingOptions: {
-    type: [String],
-    default: ["email", "sms"]
+    type: [{
+        type: String,
+        enum: ["email","sms"]
+    }],
+    default: ["email","sms"]
   },
   thankYouMessage: {
     type: String,

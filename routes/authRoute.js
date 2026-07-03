@@ -2,7 +2,12 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const authController = require('../controllers/authController');
+const validate = require("../middleware/validate")
 const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
+const {
+    registerSchema,
+    loginSchema
+} = require("../validators/authValidator");
 
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000, 
@@ -30,7 +35,18 @@ const registerLimiter = rateLimit({
     }
   });
 
-router.post('/register', registerLimiter, authController.register);
-router.post('/login', loginLimiter, authController.login);
+router.post(
+    "/register",
+    registerLimiter,
+    validate(registerSchema),
+    authController.register
+);
+
+router.post(
+    "/login",
+    loginLimiter,
+    validate(loginSchema),
+    authController.login
+);
 
 module.exports = router;

@@ -3,17 +3,9 @@ const TestimonialSettings = require('../models/testimonialSettings');
 const { v4: uuidv4 } = require('uuid');
 const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
 
-exports.createTestimonial = async (req, res) => {
+exports.createTestimonial = async (req, res, next) => {
   try {
     const { customerName, customerEmail, customerPhone, rating, text, videoUrl } = req.body;
-
-    if (!customerName) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Customer name is required.'
-      });
-    }
 
     const newTestimonial = new Testimonial({
       testimonialId: uuidv4(), 
@@ -24,6 +16,7 @@ exports.createTestimonial = async (req, res) => {
       rating,
       text,
       videoUrl,
+      consentGiven,
       status: 'draft' 
     });
 
@@ -36,29 +29,15 @@ exports.createTestimonial = async (req, res) => {
       data: newTestimonial
     });
   } catch (error) {
-    console.error('Create testimonial error:', error);
-    if (error.name === "ValidationError") {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-          code: HTTP_STATUS.BAD_REQUEST,
-          status: RESPONSE_STATUS.FAILURE,
-          message: Object.values(error.errors)
-              .map(err => err.message)
-              .join(", ")
-      });
-    }
-    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      status: RESPONSE_STATUS.FAILURE,
-      message: 'Internal server error.'
-    });
+    next(error)
   }
 };
 
-exports.getTestimonials = async (req, res) => {
+exports.getTestimonials = async (req, res, next) => {
   try {
     const currentUserId = req.user.userId;
     
-    const { status, page = 1, limit = 10, sort = "createdAt" } = req.query;
+    const { status, page, limit, sort } = req.query;
 
     const queryFilter = {
       userId: currentUserId,
@@ -86,31 +65,23 @@ exports.getTestimonials = async (req, res) => {
       code: HTTP_STATUS.OK,
       status: RESPONSE_STATUS.SUCCESS,
       message: "Data retrieved successfully",
-      data: {
-        testimonials,
+      data: testimonials,
         pagination: {
-          total: totalCount,
-          page: Number(page),
-          limit: Number(limit),
-          pages: Math.ceil(totalCount / limit)
+            total: totalCount,
+            page: Number(page),
+            limit: Number(limit),
+            pages: Math.ceil(totalCount / Number(limit))
         }
-      }
     });
   } catch (error) {
-    console.error('Get testimonials error:', error);
-    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      status: RESPONSE_STATUS.FAILURE,
-      message: 'Internal server error.'
-    });
+    next(error)
   }
 };
 
-exports.getTestimonialById = async (req, res) => {
+exports.getTestimonialById = async (req, res, next) => {
     try {
         const testimonial = await Testimonial.findOne({
             testimonialId: req.params.testimonialId,
-            userId: req.user.userId,
             isDeleted: false
         });
 
@@ -122,6 +93,14 @@ exports.getTestimonialById = async (req, res) => {
             });
         }
 
+        if (testimonial.userId !== req.user.userId) {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({ 
+                code: HTTP_STATUS.FORBIDDEN, 
+                status: RESPONSE_STATUS.FAILURE, 
+                message: "Forbidden. You do not own this testimonial." 
+            });
+        }
+
         return res.status(HTTP_STATUS.OK).json({
             code: HTTP_STATUS.OK,
             status: RESPONSE_STATUS.SUCCESS,
@@ -129,16 +108,11 @@ exports.getTestimonialById = async (req, res) => {
             data: testimonial
         });
     } catch (error) {
-        console.error(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            status: RESPONSE_STATUS.FAILURE,
-            message: "Internal server error."
-        });
+        next(error)
     }
 };
 
-exports.updateTestimonial = async (req, res) => {
+exports.updateTestimonial = async (req, res, next) => {
   try {
     const { testimonialId } = req.params;
     const currentUserId = req.user.userId;
@@ -161,18 +135,23 @@ exports.updateTestimonial = async (req, res) => {
       });
     }
     
-    const updateData = { ...req.body };
+    const allowedFields = [
+        "customerName",
+        "customerEmail",
+        "customerPhone",
+        "rating",
+        "text",
+        "videoUrl",
+        "consentGiven"
+    ];
 
-    delete updateData._id;
-    delete updateData.userId;
-    delete updateData.testimonialId;
-    delete updateData.status;
-    delete updateData.sharedAt;
-    delete updateData.sharedChannels;
-    delete updateData.isDeleted;
-    delete updateData.deletedAt;
-    delete updateData.createdAt;
-    delete updateData.updatedAt;
+    const updateData = {};
+
+    allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+            updateData[field] = req.body[field];
+        }
+    });
 
     Object.assign(testimonial, updateData);
     await testimonial.save();
@@ -184,33 +163,18 @@ exports.updateTestimonial = async (req, res) => {
       data: testimonial
     });
   } catch (error) {
-    console.error('Update testimonial error:', error);
-    if (error.name === "ValidationError") {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: Object.values(error.errors)
-        .map(err => err.message)
-        .join(", ")
-      });
-    }
-    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      status: RESPONSE_STATUS.FAILURE,
-      message: 'Internal server error.'
-    });
+    next(error)
   }
 };
 
-exports.updateStatus = async (req, res) => {
+exports.updateStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
         const testimonial = await Testimonial.findOne({
             testimonialId: req.params.testimonialId,
-            userId: req.user.userId,
             isDeleted: false
         });
-
+        
         if (!testimonial) {
             return res.status(HTTP_STATUS.NOT_FOUND).json({
                 code: HTTP_STATUS.NOT_FOUND,
@@ -219,6 +183,14 @@ exports.updateStatus = async (req, res) => {
             });
         }
 
+        if (testimonial.userId !== req.user.userId) {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({ 
+                code: HTTP_STATUS.FORBIDDEN, 
+                status: RESPONSE_STATUS.FAILURE, 
+                message: "Forbidden. You do not own this testimonial." 
+            });
+        }
+        
         const transitions = {
             draft: "recording",
             recording: "processing",
@@ -247,41 +219,16 @@ exports.updateStatus = async (req, res) => {
             data: testimonial
         });
     } catch (error) {
-        console.error(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            status: RESPONSE_STATUS.FAILURE,
-            message: "Internal server error."
-        });
+        next(error)
     }
 };
 
-exports.shareTestimonial = async (req, res) => {
+exports.shareTestimonial = async (req, res, next) => {
     try {
         const { channels } = req.body;
-        if (!Array.isArray(channels) || channels.length === 0) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                code: HTTP_STATUS.BAD_REQUEST,
-                status: RESPONSE_STATUS.FAILURE,
-                message: "Channels are required."
-            });
-        }
-        const allowedChannels = [ "email","sms","facebook","instagram"];
-        const invalidChannels = channels.filter(
-            channel => !allowedChannels.includes(channel)
-        );
-
-        if (invalidChannels.length) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                code: HTTP_STATUS.BAD_REQUEST,
-                status: RESPONSE_STATUS.FAILURE,
-                message: `Invalid channels: ${invalidChannels.join(", ")}`
-            });
-        }
-
+        
         const testimonial = await Testimonial.findOne({
             testimonialId: req.params.testimonialId,
-            userId: req.user.userId,
             isDeleted: false
         });
 
@@ -290,6 +237,24 @@ exports.shareTestimonial = async (req, res) => {
                 code: HTTP_STATUS.NOT_FOUND,
                 status: RESPONSE_STATUS.FAILURE,
                 message: "Testimonial not found."
+            });
+        }
+
+        if (testimonial.userId !== req.user.userId) {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({ 
+                code: HTTP_STATUS.FORBIDDEN, 
+                status: RESPONSE_STATUS.FAILURE, 
+                message: "Forbidden. You do not own this testimonial." 
+            });
+        }
+
+        if (testimonial.status !== "completed" &&
+            testimonial.status !== "shared") {
+
+            return res.status(400).json({
+                code: 400,
+                status: "failure",
+                message: "Only completed testimonials can be shared."
             });
         }
 
@@ -315,16 +280,11 @@ exports.shareTestimonial = async (req, res) => {
             data: testimonial
         });
     } catch (error) {
-        console.error(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            status: RESPONSE_STATUS.FAILURE,
-            message: "Internal server error."
-        });
+       next(error)
     }
 };
 
-exports.deleteTestimonial = async (req, res) => {
+exports.deleteTestimonial = async (req, res, next) => {
   try {
     const { testimonialId } = req.params;
     const currentUserId = req.user.userId;
@@ -357,16 +317,11 @@ exports.deleteTestimonial = async (req, res) => {
       message: 'Testimonial deleted successfully.'
     });
   } catch (error) {
-    console.error('Delete testimonial error:', error);
-    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      status: RESPONSE_STATUS.FAILURE,
-      message: 'Internal server error.'
-    });
+    next(error)
   }
 };
 
-exports.getSettings = async (req, res) => {
+exports.getSettings = async (req, res, next) => {
     try {
         const settings = await TestimonialSettings.findOne({
             userId: req.user.userId
@@ -379,25 +334,29 @@ exports.getSettings = async (req, res) => {
             data: settings || null
         });
     } catch (error) {
-        console.error(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            status: RESPONSE_STATUS.FAILURE,
-            message: "Internal server error."
-        });
-
+        next(error)
     }
 };
 
-exports.upsertSettings = async (req, res) => {
+exports.upsertSettings = async (req, res, next) => {
     try {
-        const updateData = { ...req.body };
-    
-        delete updateData._id;
-        delete updateData.userId;
-        delete updateData.createdAt;
-        delete updateData.updatedAt;
-        delete updateData.__v;
+        const allowedFields = [
+            "isEnabled",
+            "defaultVideoLength",
+            "videoLengthOptions",
+            "questionnaire",
+            "sendingOptions",
+            "thankYouMessage",
+            "contactConsent"
+        ];
+
+        const updateData = {};
+
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                updateData[field] = req.body[field];
+            }
+        });
 
         const settings = await TestimonialSettings.findOneAndUpdate(
             {
@@ -421,24 +380,11 @@ exports.upsertSettings = async (req, res) => {
             data: settings
         });
     } catch (error) {
-        console.error(error);
-        if (error.name === "ValidationError") {
-          return res.status(HTTP_STATUS.BAD_REQUEST).json({
-              code: HTTP_STATUS.BAD_REQUEST,
-              status: RESPONSE_STATUS.FAILURE,
-              message: Object.values(error.errors)
-                .map(err => err.message)
-                .join(", ")
-          });
-        }
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            status: RESPONSE_STATUS.FAILURE,
-            message: "Internal server error."
-        });
+        next(error)
     }
 };
-exports.getAnalytics = async (req, res) => {
+
+exports.getAnalytics = async (req, res, next) => {
     try {
         const userId = req.user.userId;
         const { startDate, endDate } = req.query;
@@ -446,32 +392,6 @@ exports.getAnalytics = async (req, res) => {
             userId,
             isDeleted: false
         };
-
-        if (startDate && isNaN(Date.parse(startDate))) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                code: HTTP_STATUS.BAD_REQUEST,
-                status: RESPONSE_STATUS.FAILURE,
-                message: "Invalid startDate format."
-            });
-        }
-
-        if (endDate && isNaN(Date.parse(endDate))) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                code: HTTP_STATUS.BAD_REQUEST,
-                status: RESPONSE_STATUS.FAILURE,
-                message: "Invalid endDate format."
-            });
-        }
-        
-        if (startDate && endDate) {
-            if (new Date(startDate) > new Date(endDate)) {
-                return res.status(HTTP_STATUS.BAD_REQUEST).json({
-                    code: HTTP_STATUS.BAD_REQUEST,
-                    status: RESPONSE_STATUS.FAILURE,
-                    message: "startDate cannot be later than endDate."
-                });
-            }
-        }
 
         if (startDate || endDate) {
             matchStage.createdAt = {};
@@ -552,11 +472,6 @@ exports.getAnalytics = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("Analytics error:", error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-            status: RESPONSE_STATUS.FAILURE,
-            message: "Internal server error."
-        });
+        next(error)
     }
 };
