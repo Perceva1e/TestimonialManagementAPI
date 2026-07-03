@@ -37,6 +37,15 @@ exports.createTestimonial = async (req, res) => {
     });
   } catch (error) {
     console.error('Create testimonial error:', error);
+    if (error.name === "ValidationError") {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          code: HTTP_STATUS.BAD_REQUEST,
+          status: RESPONSE_STATUS.FAILURE,
+          message: Object.values(error.errors)
+              .map(err => err.message)
+              .join(", ")
+      });
+    }
     return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
       status: RESPONSE_STATUS.FAILURE,
@@ -49,7 +58,7 @@ exports.getTestimonials = async (req, res) => {
   try {
     const currentUserId = req.user.userId;
     
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 10, sort = "createdAt" } = req.query;
 
     const queryFilter = {
       userId: currentUserId,
@@ -59,27 +68,31 @@ exports.getTestimonials = async (req, res) => {
     if (status) {
       queryFilter.status = status;
     }
+    
+    const sortOptions = {};
+    sortOptions[sort] = -1;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (Number(page) - 1) * Number(limit);
 
     const [testimonials, totalCount] = await Promise.all([
       Testimonial.find(queryFilter)
-        .sort({ createdAt: -1 }) 
+        .sort(sortOptions) 
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(Number(limit)),
       Testimonial.countDocuments(queryFilter)
     ]);
 
     return res.status(HTTP_STATUS.OK).json({
       code: HTTP_STATUS.OK,
       status: RESPONSE_STATUS.SUCCESS,
+      message: "Data retrieved successfully",
       data: {
         testimonials,
         pagination: {
           total: totalCount,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(totalCount / limit)
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(totalCount / limit)
         }
       }
     });
@@ -93,11 +106,42 @@ exports.getTestimonials = async (req, res) => {
   }
 };
 
+exports.getTestimonialById = async (req, res) => {
+    try {
+        const testimonial = await Testimonial.findOne({
+            testimonialId: req.params.testimonialId,
+            userId: req.user.userId,
+            isDeleted: false
+        });
+
+        if (!testimonial) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                code: HTTP_STATUS.NOT_FOUND,
+                status: RESPONSE_STATUS.FAILURE,
+                message: "Testimonial not found."
+            });
+        }
+
+        return res.status(HTTP_STATUS.OK).json({
+            code: HTTP_STATUS.OK,
+            status: RESPONSE_STATUS.SUCCESS,
+            message: "Data retrieved successfully",
+            data: testimonial
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            status: RESPONSE_STATUS.FAILURE,
+            message: "Internal server error."
+        });
+    }
+};
+
 exports.updateTestimonial = async (req, res) => {
   try {
     const { testimonialId } = req.params;
     const currentUserId = req.user.userId;
-    const updateData = req.body;
 
     const testimonial = await Testimonial.findOne({ testimonialId, isDeleted: false });
     
@@ -116,10 +160,19 @@ exports.updateTestimonial = async (req, res) => {
         message: 'Forbidden. You do not own this testimonial.'
       });
     }
+    
+    const updateData = { ...req.body };
 
-    delete updateData.testimonialId;
+    delete updateData._id;
     delete updateData.userId;
+    delete updateData.testimonialId;
+    delete updateData.status;
+    delete updateData.sharedAt;
+    delete updateData.sharedChannels;
     delete updateData.isDeleted;
+    delete updateData.deletedAt;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
 
     Object.assign(testimonial, updateData);
     await testimonial.save();
@@ -132,12 +185,143 @@ exports.updateTestimonial = async (req, res) => {
     });
   } catch (error) {
     console.error('Update testimonial error:', error);
+    if (error.name === "ValidationError") {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        code: HTTP_STATUS.BAD_REQUEST,
+        status: RESPONSE_STATUS.FAILURE,
+        message: Object.values(error.errors)
+        .map(err => err.message)
+        .join(", ")
+      });
+    }
     return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
       status: RESPONSE_STATUS.FAILURE,
       message: 'Internal server error.'
     });
   }
+};
+
+exports.updateStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        const testimonial = await Testimonial.findOne({
+            testimonialId: req.params.testimonialId,
+            userId: req.user.userId,
+            isDeleted: false
+        });
+
+        if (!testimonial) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                code: HTTP_STATUS.NOT_FOUND,
+                status: RESPONSE_STATUS.FAILURE,
+                message: "Testimonial not found."
+            });
+        }
+
+        const transitions = {
+            draft: "recording",
+            recording: "processing",
+            processing: "completed",
+            completed: "shared"
+        };
+
+        if (transitions[testimonial.status] !== status) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                code: HTTP_STATUS.BAD_REQUEST,
+                status: RESPONSE_STATUS.FAILURE,
+                message: `Cannot transition from ${testimonial.status} to ${status}.`
+            });
+        }
+        testimonial.status = status;
+
+        if (status === "shared") {
+            testimonial.sharedAt = new Date();
+        }
+        await testimonial.save();
+
+        return res.status(HTTP_STATUS.OK).json({
+            code: HTTP_STATUS.OK,
+            status: RESPONSE_STATUS.SUCCESS,
+            message: "Status updated successfully.",
+            data: testimonial
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            status: RESPONSE_STATUS.FAILURE,
+            message: "Internal server error."
+        });
+    }
+};
+
+exports.shareTestimonial = async (req, res) => {
+    try {
+        const { channels } = req.body;
+        if (!Array.isArray(channels) || channels.length === 0) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                code: HTTP_STATUS.BAD_REQUEST,
+                status: RESPONSE_STATUS.FAILURE,
+                message: "Channels are required."
+            });
+        }
+        const allowedChannels = [ "email","sms","facebook","instagram"];
+        const invalidChannels = channels.filter(
+            channel => !allowedChannels.includes(channel)
+        );
+
+        if (invalidChannels.length) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                code: HTTP_STATUS.BAD_REQUEST,
+                status: RESPONSE_STATUS.FAILURE,
+                message: `Invalid channels: ${invalidChannels.join(", ")}`
+            });
+        }
+
+        const testimonial = await Testimonial.findOne({
+            testimonialId: req.params.testimonialId,
+            userId: req.user.userId,
+            isDeleted: false
+        });
+
+        if (!testimonial) {
+            return res.status(HTTP_STATUS.NOT_FOUND).json({
+                code: HTTP_STATUS.NOT_FOUND,
+                status: RESPONSE_STATUS.FAILURE,
+                message: "Testimonial not found."
+            });
+        }
+
+        channels.forEach(channel => {
+            if (!testimonial.sharedChannels.includes(channel)) {
+                testimonial.sharedChannels.push(channel);
+            }
+        });
+
+        if ( testimonial.status === "completed") {
+            testimonial.status = "shared";
+        }
+
+        if (!testimonial.sharedAt) {
+            testimonial.sharedAt = new Date();
+        }
+        await testimonial.save();
+
+        return res.status(HTTP_STATUS.OK).json({
+            code: HTTP_STATUS.OK,
+            status: RESPONSE_STATUS.SUCCESS,
+            message: "Testimonial shared successfully.",
+            data: testimonial
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            status: RESPONSE_STATUS.FAILURE,
+            message: "Internal server error."
+        });
+    }
 };
 
 exports.deleteTestimonial = async (req, res) => {
@@ -207,8 +391,14 @@ exports.getSettings = async (req, res) => {
 
 exports.upsertSettings = async (req, res) => {
     try {
-        const updateData = req.body;
+        const updateData = { ...req.body };
+    
+        delete updateData._id;
         delete updateData.userId;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+        delete updateData.__v;
+
         const settings = await TestimonialSettings.findOneAndUpdate(
             {
                 userId: req.user.userId
@@ -232,6 +422,15 @@ exports.upsertSettings = async (req, res) => {
         });
     } catch (error) {
         console.error(error);
+        if (error.name === "ValidationError") {
+          return res.status(HTTP_STATUS.BAD_REQUEST).json({
+              code: HTTP_STATUS.BAD_REQUEST,
+              status: RESPONSE_STATUS.FAILURE,
+              message: Object.values(error.errors)
+                .map(err => err.message)
+                .join(", ")
+          });
+        }
         return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
             code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             status: RESPONSE_STATUS.FAILURE,
@@ -264,6 +463,16 @@ exports.getAnalytics = async (req, res) => {
             });
         }
         
+        if (startDate && endDate) {
+            if (new Date(startDate) > new Date(endDate)) {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    code: HTTP_STATUS.BAD_REQUEST,
+                    status: RESPONSE_STATUS.FAILURE,
+                    message: "startDate cannot be later than endDate."
+                });
+            }
+        }
+
         if (startDate || endDate) {
             matchStage.createdAt = {};
             if (startDate) {
