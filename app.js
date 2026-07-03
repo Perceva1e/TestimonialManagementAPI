@@ -1,15 +1,14 @@
 require('dotenv').config();
 
 const express = require('express');
-const mongoose = require('mongoose');
+
 const authRoutes = require('./routes/authRoute');
 const testimonialRoutes = require('./routes/testimonialRoute');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
-const PORT = process.env.PORT;
-const MONGODB_URI = process.env.MONGODB_URI;
 
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/testimonials', testimonialRoutes);
@@ -24,8 +23,6 @@ async function connectDB() {
   }
 }
 
-connectDB();
-
 app.get('/health', (req, res) => {
   res.status(200).json({
     code: 200,
@@ -34,6 +31,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+app.use(errorHandler);
+
+module.exports = app;

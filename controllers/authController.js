@@ -1,27 +1,12 @@
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Counter = require('../models/counter');
 const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
 
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
   try {
-    if (!req.body) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Request body is missing.'
-      });
-    }
-
     const { email, password, businessName, role } = req.body;
-
-    if (!email || !password || !businessName) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Email, password and business name are required.'
-      });
-    }
 
     const candidate = await User.findOne({ email });
     if (candidate) {
@@ -32,8 +17,15 @@ exports.register = async (req, res) => {
       });
     }
 
-    const lastUser = await User.findOne().sort({ userId: -1 });
-    const nextUserId = lastUser ? lastUser.userId + 1 : 1;
+    const counter = await Counter.findOneAndUpdate(
+      { name: 'userId' },
+      { $inc: { value: 1 } },
+      {
+          new: true,
+          upsert: true
+      }
+    );
+    const nextUserId = counter.value;
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -71,43 +63,13 @@ exports.register = async (req, res) => {
     });
 
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: messages.join(', ') 
-      });
-    }
-
-    console.error('Registration error:', error);
-    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      status: RESPONSE_STATUS.FAILURE,
-      message: 'Internal server error.'
-    });
+    next(error);
   }
 };
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
-    if (!req.body) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Request body is missing.'
-      });
-    }
-
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Email and password are required.'
-      });
-    }
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -115,6 +77,14 @@ exports.login = async (req, res) => {
         code: HTTP_STATUS.BAD_REQUEST,
         status: RESPONSE_STATUS.FAILURE,
         message: 'Invalid email or password.'
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(HTTP_STATUS.FORBIDDEN).json({
+        code: HTTP_STATUS.FORBIDDEN,
+        status: RESPONSE_STATUS.FAILURE,
+        message: "User account is inactive."
       });
     }
 
@@ -141,11 +111,6 @@ exports.login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
-    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      status: RESPONSE_STATUS.FAILURE,
-      message: 'Internal server error.'
-    });
+    next(error);
   }
 };
