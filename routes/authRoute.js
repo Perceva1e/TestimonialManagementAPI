@@ -35,12 +35,20 @@ const registerLimiter = rateLimit({
     }
   });
 
-router.post(
-    "/register",
-    registerLimiter,
-    validate(registerSchema),
-    authController.register
-);
+if (process.env.NODE_ENV !== "test") {
+    router.post(
+        "/register",
+        registerLimiter,
+        validate(registerSchema),
+        authController.register
+    );
+} else {
+    router.post(
+        "/register",
+        validate(registerSchema),
+        authController.register
+    );
+}
 
 router.post(
     "/login",
