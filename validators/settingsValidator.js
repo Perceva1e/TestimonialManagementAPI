@@ -1,7 +1,6 @@
 const Joi = require("joi");
 
 const settingsSchema = Joi.object({
-
     isEnabled: Joi.boolean(),
 
     defaultVideoLength: Joi.number()
@@ -46,7 +45,8 @@ const settingsSchema = Joi.object({
             .trim()
             .max(300)
     })
-});
+}).min(1);
+
 module.exports = {
     settingsSchema
 };

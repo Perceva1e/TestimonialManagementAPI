@@ -44,7 +44,9 @@ const generalLimiter = rateLimit({
   }
 });
 
-app.use('/api', generalLimiter);
+if (process.env.NODE_ENV !== 'test') {
+  app.use('/api', generalLimiter);
+}
 
 app.use(express.json({ limit: '100kb' }));
 

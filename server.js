@@ -14,11 +14,6 @@ if (!process.env.MONGODB_URI) {
     process.exit(1);
 }
 
-if (!process.env.PORT) {
-    console.error("PORT is missing.");
-    process.exit(1);
-}
-
 async function startServer() {
     try {
         await mongoose.connect(process.env.MONGODB_URI);
