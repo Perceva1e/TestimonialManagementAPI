@@ -2,7 +2,8 @@ const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Counter = require('../models/counter');
-const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
+const { success, failure } = require('../lib/helpers');
+const { HTTP_STATUS } = require('../lib/constants');
 
 exports.register = async (req, res, next) => {
   try {
@@ -10,11 +11,7 @@ exports.register = async (req, res, next) => {
 
     const candidate = await User.findOne({ email });
     if (candidate) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'User with this email already exists.'
-      });
+      return failure(res, HTTP_STATUS.BAD_REQUEST, 'User with this email already exists.');
     }
 
     const counter = await Counter.findOneAndUpdate(
@@ -47,20 +44,15 @@ exports.register = async (req, res, next) => {
       { expiresIn: process.env.JWT_EXPIRY || "7d"}
     );
 
-    return res.status(HTTP_STATUS.CREATED).json({
-      code: HTTP_STATUS.CREATED,
-      status: RESPONSE_STATUS.SUCCESS,
-      message: 'User registered successfully',
-      data: {
-        user: {
-          userId: newUser.userId,
-          email: newUser.email,
-          businessName: newUser.businessName,
-          role: newUser.role,
-          isActive: newUser.isActive
-        },
-        token
-      }
+    return success(res, HTTP_STATUS.CREATED, 'User registered successfully', {
+      user: {
+        userId: newUser.userId,
+        email: newUser.email,
+        businessName: newUser.businessName,
+        role: newUser.role,
+        isActive: newUser.isActive
+      },
+      token
     });
 
   } catch (error) {
@@ -74,28 +66,16 @@ exports.login = async (req, res, next) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Invalid email or password.'
-      });
+      return failure(res, HTTP_STATUS.BAD_REQUEST, 'Invalid email or password.');
     }
 
     if (!user.isActive) {
-      return res.status(HTTP_STATUS.FORBIDDEN).json({
-        code: HTTP_STATUS.FORBIDDEN,
-        status: RESPONSE_STATUS.FAILURE,
-        message: "User account is inactive."
-      });
+      return failure(res, HTTP_STATUS.FORBIDDEN, "User account is inactive.");
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        code: HTTP_STATUS.BAD_REQUEST,
-        status: RESPONSE_STATUS.FAILURE,
-        message: 'Invalid email or password.'
-      });
+      return failure(res, HTTP_STATUS.BAD_REQUEST, 'Invalid email or password.');
     }
 
     const token = jwt.sign(
@@ -104,12 +84,7 @@ exports.login = async (req, res, next) => {
       { expiresIn: process.env.JWT_EXPIRY || "7d"}
     );
 
-    return res.status(HTTP_STATUS.OK).json({
-      code: HTTP_STATUS.OK,
-      status: RESPONSE_STATUS.SUCCESS,
-      message: 'Logged in successfully',
-      data: { token }
-    });
+    return success(res, HTTP_STATUS.OK, 'Logged in successfully', { token });
 
   } catch (error) {
     next(error);

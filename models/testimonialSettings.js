@@ -30,10 +30,10 @@ const testimonialSettingsSchema = new mongoose.Schema({
     type: [String],
     default: ["What do you like about our service?"]
   },
-  sendingOptions: {
+sendingOptions: {
     type: [{
         type: String,
-        enum: ["email","sms"]
+        enum: ["email","sms","facebook","instagram"]
     }],
     default: ["email","sms"]
   },
