@@ -98,12 +98,23 @@ describe("Settings API", () => {
 
     });
 
-    test("unauthorized request", async () => {
+test("unauthorized request", async () => {
 
         const res = await request(app)
             .get("/api/testimonials/settings");
 
         expect(res.statusCode).toBe(401);
+
+    });
+
+    test("empty body should be rejected", async () => {
+
+        const res = await request(app)
+            .post("/api/testimonials/settings")
+            .set("Authorization", `Bearer ${token}`)
+            .send({});
+
+        expect(res.statusCode).toBe(400);
 
     });
 
