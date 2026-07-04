@@ -8,6 +8,17 @@ const testimonialStatuses = [
     "shared"
 ];
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const testimonialIdSchema = Joi.object({
+    testimonialId: Joi.string()
+        .pattern(UUID_PATTERN)
+        .required()
+        .messages({
+            'string.pattern.base': 'Invalid testimonialId format. Must be a valid UUID v4.'
+        })
+});
+
 const createTestimonialSchema = Joi.object({
     customerName: Joi.string()
         .trim()
@@ -42,10 +53,6 @@ const createTestimonialSchema = Joi.object({
         .optional(),
 
     consentGiven: Joi.boolean()
-        .optional(),
-
-    status: Joi.string()
-        .valid(...testimonialStatuses)
         .optional()
 });
 
@@ -97,5 +104,6 @@ module.exports = {
     createTestimonialSchema,
     updateTestimonialSchema,
     updateStatusSchema,
-    shareSchema
+    shareSchema,
+    testimonialIdSchema
 };

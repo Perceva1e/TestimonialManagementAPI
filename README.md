@@ -97,20 +97,28 @@ npm test
 
 # Архитектура проекта
 
-Проект построен по MVC-подобной архитектуре с разделением ответственности между слоями:
+Проект построен по **MVC + Service Layer** архитектуре с разделением ответственности между слоями:
 
 ```
 ├── controllers/
+│   ├── testimonialController.js  # CRUD operations for testimonials
+│   ├── settingsController.js       # Settings management
+│   └── analyticsController.js      # Analytics endpoints
+├── services/
+│   ├── testimonialService.js       # Business logic for testimonials
+│   ├── settingsService.js          # Business logic for settings
+│   └── analyticsService.js         # Business logic for analytics
 ├── middleware/
 ├── models/
 ├── routes/
 ├── validators/
 ├── lib/
+│   ├── constants.js
+│   └── helpers.js                  # Response helpers (success/failure)
 ├── tests/
 ├── app.js
 ├── server.js
 └── README.md
-└── ...
 ```
 
 Такой подход делает код более читаемым, упрощает поддержку и облегчает дальнейшее масштабирование проекта.
@@ -166,9 +174,9 @@ deletedAt: Date
 Для получения аналитики используется Aggregation Pipeline (`$match`, `$facet`, `$group`), что позволяет за один запрос вычислить:
 
 * общее количество отзывов;
-* средний рейтинг;
+* средний рейтинг (рассчитывается только по отзывам с указанным рейтингом);
 * распределение отзывов по статусам;
-* статистику за выбранный период.
+* статистику за выбранный период (даты возвращаются в ISO-формате).
 
 Такой подход минимизирует количество обращений к базе данных и снижает нагрузку на приложение.
 
@@ -194,7 +202,7 @@ deletedAt: Date
 | GET    | `/api/testimonials/:testimonialId`        | Получить отзыв по ID                                            |
 | PUT    | `/api/testimonials/:testimonialId`        | Обновить текст и рейтинг                                        |
 | PATCH  | `/api/testimonials/:testimonialId/status` | Изменить статус (с проверкой допустимых переходов)              |
-| POST   | `/api/testimonials/:testimonialId/share`  | Добавить каналы публикации                                      |
+| POST   | `/api/testimonials/:testimonialId/share`  | Добавить каналы публикации (авто-переход в "shared" при "completed") |
 | DELETE | `/api/testimonials/:testimonialId`        | Мягкое удаление отзыва                                          |
 
 ---
@@ -244,12 +252,55 @@ deletedAt: Date
 
 Это предотвращает brute-force атаки, ограничивая количество запросов с одного IP-адреса.
 
+### Service Layer
+
+Реализован отдельный слой сервисов для бизнес-логики:
+- `testimonialService` — логика работы с отзывами (создание, обновление, статусы, публикация)
+- `settingsService` — логика работы с настройками
+- `analyticsService` — логика получения аналитики
+
+### Response Helpers
+
+Созданы утилиты `success()` и `failure()` для унификации форматов ответов и устранения дублирования кода.
+
+### UUID Validation
+
+Добавлена валидация формата `testimonialId` (UUID v4) для параметров маршрутов, что предотвращает передачу некорректных данных в MongoDB.
+
+### Security Tests
+
+Добавлены тесты на попытку доступа к чужим данным (unauthorized access tests).
+
 ---
 
-## Что можно улучшить?
-
-При наличии дополнительного времени проект можно было бы доработать следующим образом.
+## Что можно улучшить при наличии большего времени?
 
 ### Swagger (OpenAPI)
 
 Подключить Swagger-документацию для интерактивного просмотра и тестирования API, что значительно упростит интеграцию для frontend-разработчиков и сторонних клиентов.
+
+### Unit Tests
+
+Добавить unit-тесты для сервисного слоя (services) с моками Mongoose.
+
+### Refresh Tokens
+
+Реализовать механизм refresh-токенов для продления сессии без повторной авторизации.
+
+### Email/SMS Integration
+
+Интегрировать реальные сервисы отправки email и SMS для функционала отправки отзывов.
+
+### File Upload
+
+Добавить загрузку видеофайлов в облачное хранилище (S3, Cloudinary).
+
+---
+
+## Известные ограничения
+
+- **In-memory MongoDB** используется для тестов, что ограничивает тестирование производительностью
+- **Нет реальной отправки** отзывов по email/SMS — функционал имитируется
+- **Нет реальной загрузки видео** — поле `videoUrl` принимает только URL
+- **Агрегация аналитики** вычисляет средний рейтинг только по отзывам с указанным рейтингом
+- **Нет кэширования** — аналитика вычисляется при каждом запросе
