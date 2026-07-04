@@ -89,6 +89,22 @@ describe("Analytics", () => {
 
     });
 
+    test("analytics returns ISO formatted dates", async () => {
+
+        const res = await request(app)
+            .get("/api/testimonials/analytics?startDate=2025-01-01T00:00:00.000Z&endDate=2025-12-31T23:59:59.999Z")
+            .set("Authorization", `Bearer ${token}`);
+
+        expect(res.statusCode).toBe(200);
+
+        if (res.body.data.period.startDate) {
+            expect(res.body.data.period.startDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/);
+        }
+        if (res.body.data.period.endDate) {
+            expect(res.body.data.period.endDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/);
+        }
+    });
+
     test("analytics requires auth", async () => {
 
         const res = await request(app)

@@ -30,7 +30,9 @@ const settingsSchema = Joi.object({
         .items(
             Joi.string().valid(
                 "email",
-                "sms"
+                "sms",
+                "facebook",
+                "instagram"
             )
         ),
 

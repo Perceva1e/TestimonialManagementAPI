@@ -5,7 +5,7 @@ module.exports = (schema, property = "body") => {
         const { error, value } =
             schema.validate(req[property], {
                 abortEarly: false,
-                stripUnknown: true
+                allowUnknown: false
             });
         if (error) {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({
