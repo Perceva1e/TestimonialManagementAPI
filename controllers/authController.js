@@ -19,7 +19,8 @@ exports.register = async (req, res, next) => {
 
     const counter = await Counter.findOneAndUpdate(
       { name: 'userId' },
-      { $inc: { value: 1 } },
+      { $inc: { value: 1 },
+        $setOnInsert: { name: "userId"}},
       {
           new: true,
           upsert: true
@@ -43,7 +44,7 @@ exports.register = async (req, res, next) => {
     const token = jwt.sign(
       { userId: newUser.userId, email: newUser.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRY }
+      { expiresIn: process.env.JWT_EXPIRY || "7d"}
     );
 
     return res.status(HTTP_STATUS.CREATED).json({
@@ -100,7 +101,7 @@ exports.login = async (req, res, next) => {
     const token = jwt.sign(
       { userId: user.userId, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRY }
+      { expiresIn: process.env.JWT_EXPIRY || "7d"}
     );
 
     return res.status(HTTP_STATUS.OK).json({
