@@ -40,6 +40,54 @@ describe("Authentication", () => {
             .toContain("already exists");
     });
 
+    test("case-insensitive duplicate email returns 400", async () => {
+        await request(app)
+            .post("/api/auth/register")
+            .send({
+                email: "CaseTest@test.com",
+                password: "Password123",
+                businessName: "Test Business"
+            });
+
+        const res = await request(app)
+            .post("/api/auth/register")
+            .send({
+                email: "casetest@test.com",
+                password: "Password123",
+                businessName: "Test Business 2"
+            });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message)
+            .toContain("already exists");
+    });
+
+test("role field is rejected in registration (not in schema)", async () => {
+        const res = await request(app)
+            .post("/api/auth/register")
+            .send({
+                email: "rolecheck@test.com",
+                password: "Password123",
+                businessName: "Test Business",
+                role: "staff"
+            });
+
+        expect(res.statusCode).toBe(400);
+    });
+
+    test("user gets default role 'owner' on registration", async () => {
+        const res = await request(app)
+            .post("/api/auth/register")
+            .send({
+                email: "roletest@test.com",
+                password: "Password123",
+                businessName: "Test Business"
+            });
+
+        expect(res.statusCode).toBe(201);
+        expect(res.body.data.user.role).toBe("owner");
+    });
+
     test("login success", async () => {
 
         await request(app)

@@ -12,7 +12,7 @@ RESTful API для платформы сбора, управления и ана
 - **Authentication:** JWT
 - **Validation:** Joi
 - **Testing:** Jest + Supertest
-- **Security:** express-rate-limit
+- **Security:** Helmet, CORS, express-rate-limit
 
 ---
 
@@ -79,6 +79,13 @@ GET /health
 ```bash
 npm test
 ```
+
+Запуск с покрытием:
+
+```bash
+npm run test:coverage
+```
+
 Покрываются следующие сценарии:
 
 - регистрация пользователя;
@@ -94,6 +101,46 @@ npm test
 - авторизация защищённых маршрутов.
 
 ---
+
+## 6. API Документация (OpenAPI/Swagger)
+
+OpenAPI спецификация доступна в файле `openapi.yaml`. Для просмотра и тестирования API можно использовать:
+
+- [Swagger Editor](https://editor.swagger.io/) — импортировать openapi.yaml
+- [Swagger UI](https://swagger.io/tools/swagger-ui/) — разместить UI на сервере
+- Любой OpenAPI-совместимый инструмент
+
+---
+
+## 7. CI/CD
+
+Проект настроен для автоматической проверки через GitHub Actions. При каждом push и pull request запускаются:
+
+- Тесты на Node.js 16.x, 18.x, 20.x
+- Проверка покрытия кода тестами
+
+Файл конфигурации: `.github/workflows/ci.yml`
+
+---
+
+## 8. Security Notes
+
+### CORS Configuration
+
+В production окружении переменная `ALLOWED_ORIGINS` обязательна. Пример:
+
+```env
+ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+```
+
+### Rate Limiting
+
+- General API: 100 запросов за 15 минут
+- Login: 5 попыток за 1 минуту
+- Register: 10 попыток за 1 минуту
+
+Rate limiting автоматически отключается в тестовом окружении.
+
 
 # Архитектура проекта
 
