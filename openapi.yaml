@@ -1,0 +1,766 @@
+openapi: 3.0.3
+info:
+  title: Testimonial Management API
+  description: RESTful API for collecting, managing, and analyzing video testimonials
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        userId:
+          type: number
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        businessName:
+          type: string
+          example: "Coffee Shop"
+        role:
+          type: string
+          enum: [owner, staff]
+          example: "owner"
+        isActive:
+          type: boolean
+          example: true
+
+    Testimonial:
+      type: object
+      properties:
+        testimonialId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        userId:
+          type: number
+          example: 1
+        customerName:
+          type: string
+          example: "John Doe"
+        customerEmail:
+          type: string
+          format: email
+          example: "john@example.com"
+        customerPhone:
+          type: string
+          example: "+1234567890"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        text:
+          type: string
+          example: "Amazing service!"
+        videoUrl:
+          type: string
+          format: uri
+          example: "https://example.com/video.mp4"
+        status:
+          type: string
+          enum: [draft, recording, processing, completed, shared]
+          example: "draft"
+        consentGiven:
+          type: boolean
+          example: true
+        sharedAt:
+          type: string
+          format: date-time
+        sharedChannels:
+          type: array
+          items:
+            type: string
+            enum: [email, sms, facebook, instagram]
+        isDeleted:
+          type: boolean
+        deletedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TestimonialSettings:
+      type: object
+      properties:
+        userId:
+          type: number
+        isEnabled:
+          type: boolean
+          example: true
+        defaultVideoLength:
+          type: integer
+          minimum: 5
+          maximum: 60
+          example: 10
+        videoLengthOptions:
+          type: array
+          items:
+            type: integer
+          example: [5, 10, 15, 20, 25]
+        questionnaire:
+          type: array
+          items:
+            type: string
+          example: ["What do you like about our service?"]
+        sendingOptions:
+          type: array
+          items:
+            type: string
+            enum: [email, sms, facebook, instagram]
+          example: ["email", "sms"]
+        thankYouMessage:
+          type: string
+          example: "Thank you for your testimonial!"
+        contactConsent:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            text:
+              type: string
+          example:
+            enabled: true
+            text: "Join our mailing list"
+
+    Analytics:
+      type: object
+      properties:
+        overview:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 10
+            averageRating:
+              type: number
+              example: 4.5
+            byStatus:
+              type: object
+              properties:
+                draft:
+                  type: integer
+                recording:
+                  type: integer
+                processing:
+                  type: integer
+                completed:
+                  type: integer
+                shared:
+                  type: integer
+        period:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        status:
+          type: string
+          enum: [failure]
+        message:
+          type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+        data:
+          oneOf:
+            - {}
+            - 
+              type: array
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check if the server is running
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  status:
+                    type: string
+                    example: "success"
+                  message:
+                    type: string
+                    example: "Server is running perfectly"
+
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - businessName
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 64
+                  example: "Password123"
+                businessName:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+        '400':
+          description: Validation error or duplicate email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      summary: Login
+      description: Authenticate user and get JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+        '400':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/testimonials:
+    get:
+      summary: Get testimonials
+      description: Get list of testimonials with pagination and filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, recording, processing, completed, shared]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, updatedAt, rating]
+            default: createdAt
+      responses:
+        '200':
+          description: Testimonials retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Testimonial'
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      pages:
+                        type: integer
+
+    post:
+      summary: Create testimonial
+      description: Create a new testimonial
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customerName
+              properties:
+                customerName:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                customerEmail:
+                  type: string
+                  format: email
+                customerPhone:
+                  type: string
+                videoUrl:
+                  type: string
+                  format: uri
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                text:
+                  type: string
+                consentGiven:
+                  type: boolean
+      responses:
+        '201':
+          description: Testimonial created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Testimonial'
+
+  /api/testimonials/{testimonialId}:
+    get:
+      summary: Get testimonial by ID
+      description: Get a single testimonial by its ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: testimonialId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Testimonial found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Testimonial'
+        '404':
+          description: Testimonial not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - not the owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update testimonial
+      description: Update testimonial details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: testimonialId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerName:
+                  type: string
+                customerEmail:
+                  type: string
+                  format: email
+                customerPhone:
+                  type: string
+                videoUrl:
+                  type: string
+                  format: uri
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                text:
+                  type: string
+                consentGiven:
+                  type: boolean
+      responses:
+        '200':
+          description: Testimonial updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Testimonial'
+
+    delete:
+      summary: Delete testimonial
+      description: Soft delete a testimonial
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: testimonialId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Testimonial deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /api/testimonials/{testimonialId}/status:
+    patch:
+      summary: Update testimonial status
+      description: Update testimonial status with valid transition
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: testimonialId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [recording, processing, completed, shared]
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Testimonial'
+        '400':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/testimonials/{testimonialId}/share:
+    post:
+      summary: Share testimonial
+      description: Share testimonial to specified channels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: testimonialId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - channels
+              properties:
+                channels:
+                  type: array
+                  items:
+                    type: string
+                    enum: [email, sms, facebook, instagram]
+      responses:
+        '200':
+          description: Testimonial shared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Testimonial'
+        '400':
+          description: Invalid status for sharing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/testimonials/settings:
+    get:
+      summary: Get settings
+      description: Get user settings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/TestimonialSettings'
+
+    post:
+      summary: Upsert settings
+      description: Create or update user settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isEnabled:
+                  type: boolean
+                defaultVideoLength:
+                  type: integer
+                  minimum: 5
+                  maximum: 60
+                videoLengthOptions:
+                  type: array
+                  items:
+                    type: integer
+                questionnaire:
+                  type: array
+                  items:
+                    type: string
+                sendingOptions:
+                  type: array
+                  items:
+                    type: string
+                    enum: [email, sms, facebook, instagram]
+                thankYouMessage:
+                  type: string
+                contactConsent:
+                  type: object
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/TestimonialSettings'
+
+  /api/testimonials/analytics:
+    get:
+      summary: Get analytics
+      description: Get testimonials analytics with optional date filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Analytics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Analytics'

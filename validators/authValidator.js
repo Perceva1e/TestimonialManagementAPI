@@ -21,11 +21,7 @@ const registerSchema = Joi.object({
         .trim()
         .min(2)
         .max(100)
-        .required(),
-        
-    role: Joi.string()
-        .valid("owner", "staff")
-        .optional()
+        .required()
 
 });
 
