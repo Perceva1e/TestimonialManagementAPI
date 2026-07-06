@@ -50,11 +50,19 @@ if (process.env.NODE_ENV !== "test") {
     );
 }
 
-router.post(
-    "/login",
-    loginLimiter,
-    validate(loginSchema),
-    authController.login
-);
+if (process.env.NODE_ENV !== "test") {
+    router.post(
+        "/login",
+        loginLimiter,
+        validate(loginSchema),
+        authController.login
+    );
+} else {
+    router.post(
+        "/login",
+        validate(loginSchema),
+        authController.login
+    );
+}
 
 module.exports = router;
