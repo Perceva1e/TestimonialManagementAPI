@@ -7,31 +7,42 @@ const { success, failure } = require('../lib/helpers');
 const { HTTP_STATUS } = require('../lib/constants');
 
 const isTransientTransactionError = (error) => {
-  return error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError');
+  return (
+    error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')
+  );
 };
 
 const withTransactionRetry = async (fn, maxRetries = 3) => {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const session = await mongoose.startSession();
-    session.startTransaction();
-    
     try {
-      const result = await fn(session);
-      await session.commitTransaction();
-      session.endSession();
-      return result;
-    } catch (error) {
-      if (isTransientTransactionError(error) && attempt < maxRetries - 1) {
+      session.startTransaction();
+      try {
+        const result = await fn(session);
+        await session.commitTransaction();
+        session.endSession();
+        return result;
+      } catch (error) {
+        if (isTransientTransactionError(error) && attempt < maxRetries - 1) {
+          if (session.inTransaction()) {
+            await session.abortTransaction();
+          }
+          session.endSession();
+          continue;
+        }
         if (session.inTransaction()) {
           await session.abortTransaction();
         }
         session.endSession();
-        continue;
+        throw error;
       }
-      if (session.inTransaction()) {
-        await session.abortTransaction();
+    } catch (error) {
+      if (
+        error.message &&
+        error.message.includes('transactions are not supported')
+      ) {
+        return await fn(null);
       }
-      session.endSession();
       throw error;
     }
   }
@@ -40,24 +51,26 @@ const withTransactionRetry = async (fn, maxRetries = 3) => {
 exports.register = async (req, res, next) => {
   try {
     const { email, password, businessName } = req.body;
-    
+
     const result = await withTransactionRetry(async (session) => {
-      const candidate = await User.findOne({ email: email.toLowerCase() }).session(session);
+      const candidate = session
+        ? await User.findOne({ email: email.toLowerCase() }).session(session)
+        : await User.findOne({ email: email.toLowerCase() });
+
       if (candidate) {
         const error = new Error('User with this email already exists.');
         error.isDuplicate = true;
         throw error;
       }
 
+      const counterOptions = session
+        ? { new: true, upsert: true, session: session }
+        : { new: true, upsert: true };
+
       const counter = await Counter.findOneAndUpdate(
         { name: 'userId' },
-        { $inc: { value: 1 },
-          $setOnInsert: { name: "userId"}},
-        {
-            new: true,
-            upsert: true,
-            session: session
-        }
+        { $inc: { value: 1 }, $setOnInsert: { name: 'userId' } },
+        counterOptions,
       );
       const nextUserId = counter.value;
 
@@ -68,15 +81,19 @@ exports.register = async (req, res, next) => {
         userId: nextUserId,
         email,
         password: hashedPassword,
-        businessName
+        businessName,
       });
 
-      await newUser.save({ session });
+      if (session) {
+        await newUser.save({ session });
+      } else {
+        await newUser.save();
+      }
 
       const token = jwt.sign(
         { userId: newUser.userId, email: newUser.email },
         process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRY || "7d"}
+        { expiresIn: process.env.JWT_EXPIRY || '7d' },
       );
 
       return {
@@ -85,14 +102,18 @@ exports.register = async (req, res, next) => {
           email: newUser.email,
           businessName: newUser.businessName,
           role: newUser.role,
-          isActive: newUser.isActive
+          isActive: newUser.isActive,
         },
-        token
+        token,
       };
     });
 
-    return success(res, HTTP_STATUS.CREATED, 'User registered successfully', result);
-
+    return success(
+      res,
+      HTTP_STATUS.CREATED,
+      'User registered successfully',
+      result,
+    );
   } catch (error) {
     if (error.isDuplicate) {
       return failure(res, HTTP_STATUS.BAD_REQUEST, error.message);
@@ -105,28 +126,35 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return failure(res, HTTP_STATUS.BAD_REQUEST, 'Invalid email or password.');
+      return failure(
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        'Invalid email or password.',
+      );
     }
 
     if (!user.isActive) {
-      return failure(res, HTTP_STATUS.FORBIDDEN, "User account is inactive.");
+      return failure(res, HTTP_STATUS.FORBIDDEN, 'User account is inactive.');
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return failure(res, HTTP_STATUS.BAD_REQUEST, 'Invalid email or password.');
+      return failure(
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        'Invalid email or password.',
+      );
     }
 
     const token = jwt.sign(
       { userId: user.userId, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRY || "7d"}
+      { expiresIn: process.env.JWT_EXPIRY || '7d' },
     );
 
     return success(res, HTTP_STATUS.OK, 'Logged in successfully', { token });
-
   } catch (error) {
     next(error);
   }

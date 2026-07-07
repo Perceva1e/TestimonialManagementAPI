@@ -2,67 +2,57 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const authController = require('../controllers/authController');
-const validate = require("../middleware/validate")
+const validate = require('../middleware/validate');
 const { HTTP_STATUS, RESPONSE_STATUS } = require('../lib/constants');
-const {
-    registerSchema,
-    loginSchema
-} = require("../validators/authValidator");
+const { registerSchema, loginSchema } = require('../validators/authValidator');
 
 const loginLimiter = rateLimit({
-  windowMs: 60 * 1000, 
-  max: 5, 
-  standardHeaders: true, 
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
     res.status(429).json({
       code: 429,
       status: 'failure',
-      message: 'Too many login attempts from this IP, please try again after a minute.'
+      message:
+        'Too many login attempts from this IP, please try again after a minute.',
     });
-  }
+  },
 });
 
 const registerLimiter = rateLimit({
-    windowMs: 60 * 1000, 
-    max: 10, 
-    handler: (req, res) => {
-      res.status(429).json({
-        code: 429,
-        status: 'failure',
-        message: 'Too many registration attempts, please try again later.'
-      });
-    }
-  });
+  windowMs: 60 * 1000,
+  max: 10,
+  handler: (req, res) => {
+    res.status(429).json({
+      code: 429,
+      status: 'failure',
+      message: 'Too many registration attempts, please try again later.',
+    });
+  },
+});
 
-if (process.env.NODE_ENV !== "test") {
-    router.post(
-        "/register",
-        registerLimiter,
-        validate(registerSchema),
-        authController.register
-    );
+if (process.env.NODE_ENV !== 'test') {
+  router.post(
+    '/register',
+    registerLimiter,
+    validate(registerSchema),
+    authController.register,
+  );
 } else {
-    router.post(
-        "/register",
-        validate(registerSchema),
-        authController.register
-    );
+  router.post('/register', validate(registerSchema), authController.register);
 }
 
-if (process.env.NODE_ENV !== "test") {
-    router.post(
-        "/login",
-        loginLimiter,
-        validate(loginSchema),
-        authController.login
-    );
+if (process.env.NODE_ENV !== 'test') {
+  router.post(
+    '/login',
+    loginLimiter,
+    validate(loginSchema),
+    authController.login,
+  );
 } else {
-    router.post(
-        "/login",
-        validate(loginSchema),
-        authController.login
-    );
+  router.post('/login', validate(loginSchema), authController.login);
 }
 
 module.exports = router;
