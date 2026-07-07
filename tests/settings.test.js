@@ -1,121 +1,98 @@
-const request = require("supertest");
-const app = require("../app");
+const request = require('supertest');
+const app = require('../app');
 
 let token;
 
 beforeEach(async () => {
+  const register = await request(app).post('/api/auth/register').send({
+    email: 'settings@test.com',
+    password: 'Password123',
+    businessName: 'Coffee',
+  });
 
-    const register = await request(app)
-        .post("/api/auth/register")
-        .send({
-            email: "settings@test.com",
-            password: "Password123",
-            businessName: "Coffee"
-        });
-
-    token = register.body.data.token;
+  token = register.body.data.token;
 });
 
-describe("Settings API", () => {
+describe('Settings API', () => {
+  test('GET settings returns null initially', async () => {
+    const res = await request(app)
+      .get('/api/testimonials/settings')
+      .set('Authorization', `Bearer ${token}`);
 
-    test("GET settings returns null initially", async () => {
+    expect(res.statusCode).toBe(200);
 
-        const res = await request(app)
-            .get("/api/testimonials/settings")
-            .set("Authorization", `Bearer ${token}`);
+    expect(res.body.data).toBeNull();
+  });
 
-        expect(res.statusCode).toBe(200);
+  test('create settings', async () => {
+    const body = {
+      isEnabled: true,
+      defaultVideoLength: 20,
+      videoLengthOptions: [10, 20, 30],
+      questionnaire: ['How was our service?'],
+      sendingOptions: ['email', 'sms'],
+      thankYouMessage: 'Thank you!',
+      contactConsent: {
+        enabled: true,
+        text: 'Subscribe',
+      },
+    };
 
-        expect(res.body.data).toBeNull();
-    });
+    const res = await request(app)
+      .post('/api/testimonials/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
 
-    test("create settings", async () => {
+    expect(res.statusCode).toBe(200);
 
-        const body = {
-            isEnabled: true,
-            defaultVideoLength: 20,
-            videoLengthOptions: [10,20,30],
-            questionnaire: [
-                "How was our service?"
-            ],
-            sendingOptions: [
-                "email",
-                "sms"
-            ],
-            thankYouMessage: "Thank you!",
-            contactConsent: {
-                enabled: true,
-                text: "Subscribe"
-            }
-        };
+    expect(res.body.data.isEnabled).toBe(true);
 
-        const res = await request(app)
-            .post("/api/testimonials/settings")
-            .set("Authorization", `Bearer ${token}`)
-            .send(body);
+    expect(res.body.data.defaultVideoLength).toBe(20);
+  });
 
-        expect(res.statusCode).toBe(200);
+  test('update existing settings', async () => {
+    await request(app)
+      .post('/api/testimonials/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        isEnabled: true,
+      });
 
-        expect(res.body.data.isEnabled).toBe(true);
+    const res = await request(app)
+      .post('/api/testimonials/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        thankYouMessage: 'Updated message',
+      });
 
-        expect(res.body.data.defaultVideoLength).toBe(20);
+    expect(res.statusCode).toBe(200);
 
-    });
+    expect(res.body.data.thankYouMessage).toBe('Updated message');
+  });
 
-    test("update existing settings", async () => {
+  test('invalid settings validation', async () => {
+    const res = await request(app)
+      .post('/api/testimonials/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        defaultVideoLength: 200,
+      });
 
-        await request(app)
-            .post("/api/testimonials/settings")
-            .set("Authorization", `Bearer ${token}`)
-            .send({
-                isEnabled: true
-            });
+    expect(res.statusCode).toBe(400);
+  });
 
-        const res = await request(app)
-            .post("/api/testimonials/settings")
-            .set("Authorization", `Bearer ${token}`)
-            .send({
-                thankYouMessage: "Updated message"
-            });
+  test('unauthorized request', async () => {
+    const res = await request(app).get('/api/testimonials/settings');
 
-        expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(401);
+  });
 
-        expect(res.body.data.thankYouMessage)
-            .toBe("Updated message");
+  test('empty body should be rejected', async () => {
+    const res = await request(app)
+      .post('/api/testimonials/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
 
-    });
-
-    test("invalid settings validation", async () => {
-
-        const res = await request(app)
-            .post("/api/testimonials/settings")
-            .set("Authorization", `Bearer ${token}`)
-            .send({
-                defaultVideoLength: 200
-            });
-
-        expect(res.statusCode).toBe(400);
-
-    });
-
-test("unauthorized request", async () => {
-
-        const res = await request(app)
-            .get("/api/testimonials/settings");
-
-        expect(res.statusCode).toBe(401);
-
-    });
-
-    test("empty body should be rejected", async () => {
-
-        const res = await request(app)
-            .post("/api/testimonials/settings")
-            .set("Authorization", `Bearer ${token}`)
-            .send({});
-
-        expect(res.statusCode).toBe(400);
-
-    });
-
+    expect(res.statusCode).toBe(400);
+  });
 });

@@ -27,14 +27,14 @@ components:
         email:
           type: string
           format: email
-          example: "user@example.com"
+          example: 'user@example.com'
         businessName:
           type: string
-          example: "Coffee Shop"
+          example: 'Coffee Shop'
         role:
           type: string
           enum: [owner, staff]
-          example: "owner"
+          example: 'owner'
         isActive:
           type: boolean
           example: true
@@ -45,20 +45,20 @@ components:
         testimonialId:
           type: string
           format: uuid
-          example: "550e8400-e29b-41d4-a716-446655440000"
+          example: '550e8400-e29b-41d4-a716-446655440000'
         userId:
           type: number
           example: 1
         customerName:
           type: string
-          example: "John Doe"
+          example: 'John Doe'
         customerEmail:
           type: string
           format: email
-          example: "john@example.com"
+          example: 'john@example.com'
         customerPhone:
           type: string
-          example: "+1234567890"
+          example: '+1234567890'
         rating:
           type: integer
           minimum: 1
@@ -66,15 +66,15 @@ components:
           example: 5
         text:
           type: string
-          example: "Amazing service!"
+          example: 'Amazing service!'
         videoUrl:
           type: string
           format: uri
-          example: "https://example.com/video.mp4"
+          example: 'https://example.com/video.mp4'
         status:
           type: string
           enum: [draft, recording, processing, completed, shared]
-          example: "draft"
+          example: 'draft'
         consentGiven:
           type: boolean
           example: true
@@ -120,16 +120,16 @@ components:
           type: array
           items:
             type: string
-          example: ["What do you like about our service?"]
+          example: ['What do you like about our service?']
         sendingOptions:
           type: array
           items:
             type: string
             enum: [email, sms, facebook, instagram]
-          example: ["email", "sms"]
+          example: ['email', 'sms']
         thankYouMessage:
           type: string
-          example: "Thank you for your testimonial!"
+          example: 'Thank you for your testimonial!'
         contactConsent:
           type: object
           properties:
@@ -139,7 +139,7 @@ components:
               type: string
           example:
             enabled: true
-            text: "Join our mailing list"
+            text: 'Join our mailing list'
 
     Analytics:
       type: object
@@ -200,8 +200,7 @@ components:
         data:
           oneOf:
             - {}
-            - 
-              type: array
+            - type: array
 
 paths:
   /health:
@@ -221,10 +220,10 @@ paths:
                     example: 200
                   status:
                     type: string
-                    example: "success"
+                    example: 'success'
                   message:
                     type: string
-                    example: "Server is running perfectly"
+                    example: 'Server is running perfectly'
 
   /api/auth/register:
     post:
@@ -248,7 +247,7 @@ paths:
                   type: string
                   minLength: 8
                   maxLength: 64
-                  example: "Password123"
+                  example: 'Password123'
                 businessName:
                   type: string
                   minLength: 2
