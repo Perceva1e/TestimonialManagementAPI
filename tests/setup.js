@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const { MongoMemoryReplSet } = require("mongodb-memory-server");
+const mongoose = require('mongoose');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_secret';
 process.env.JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
@@ -7,27 +7,27 @@ process.env.JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
 let mongo;
 
 beforeAll(async () => {
-    mongo = await MongoMemoryReplSet.create({
-        replSet: {
-            count: 1,
-            storageEngine: "wiredTiger"
-        }
-    });
+  mongo = await MongoMemoryReplSet.create({
+    replSet: {
+      count: 1,
+      storageEngine: 'wiredTiger',
+    },
+  });
 
-    const mongoUri = mongo.getUri();
-    await mongoose.connect(mongoUri);
+  const mongoUri = mongo.getUri();
+  await mongoose.connect(mongoUri);
 });
 
 afterEach(async () => {
-    const collections = mongoose.connection.collections;
-    for (const key in collections) {
-        const collection = collections[key];
-        await collection.deleteMany({});
-    }
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    const collection = collections[key];
+    await collection.deleteMany({});
+  }
 });
 
 afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongo.stop();
+  await mongoose.connection.dropDatabase();
+  await mongoose.connection.close();
+  await mongo.stop();
 });
